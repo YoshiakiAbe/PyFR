@@ -116,6 +116,10 @@ class NavierStokesNoSlpAdiaWallBCInters(NavierStokesBaseBCInters):
     type = 'no-slp-adia-wall'
     cflux_state = 'ghost'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self._tpl_c['v'] = self._eval_opts('uvw'[:self.ndims], default='0')
 
 class NavierStokesSlpAdiaWallBCInters(NavierStokesBaseBCInters):
     type = 'slp-adia-wall'
