@@ -101,8 +101,11 @@ class BaseKernelGenerator(object, metaclass=ABCMeta):
             if va.isview:
                 argt.append([np.intp]*(2 + (va.ncdim == 2)))
             # Broadcast vector
-            elif va.isbroadcast:
+            elif va.isbroadcast and va.ncdim == 1:
                 argt.append([np.intp])
+            # Stacked broadcast vector
+            elif va.isbroadcast and va.ncdim == 2:
+                argt.append([np.intp, np.int32])
             # Non-stacked vector or MPI type
             elif self.ndim == 1 and (va.ncdim == 0 or va.ismpi):
                 argt.append([np.intp])
@@ -139,8 +142,12 @@ class BaseKernelGenerator(object, metaclass=ABCMeta):
 
         # Broadcast vector
         #   name[\1] => name_v[\1]
-        if arg.isbroadcast:
+        if arg.isbroadcast and arg.ncdim == 1:
             ix = r'\1'
+        # Stacked broadcast vector
+        #   name[\1][\2] => name_v[ldim*(\1) + (\2)]
+        elif arg.isbroadcast and arg.ncdim == 2:
+            ix = r'{0}*(\1) + (\2)'.format(ldim)
         # Vector:
         #   name => name_v[X_IDX]
         elif arg.ncdim == 0:
