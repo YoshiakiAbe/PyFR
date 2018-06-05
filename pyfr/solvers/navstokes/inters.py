@@ -153,12 +153,12 @@ class NavierStokesSupInflowBCInters(NavierStokesBaseBCInters):
 
 class NavierStokesSupOutflowBCInters(NavierStokesBaseBCInters):
     type = 'sup-out-fn'
-    cflux_state = None
+    cflux_state = 'ghost'
 
 
 class NavierStokesSubInflowFrvBCInters(NavierStokesBaseBCInters):
     type = 'sub-in-frv'
-    cflux_state = 'ghost'
+    cflux_state = None
 
     def __init__(self, be, lhs, elemap, cfgsect, cfg):
         super().__init__(be, lhs, elemap, cfgsect, cfg)
@@ -224,14 +224,17 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
     type = 'sub-in-ftpttang'
     cflux_state = 'ghost'
 
-    def __init__(self, be, lhs, elemap, cfgsect, cfg):
-        super().__init__(be, lhs, elemap, cfgsect, cfg)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+#    def __init__(self, be, lhs, elemap, cfgsect, cfg):
+#        super().__init__(be, lhs, elemap, cfgsect, cfg)
 
         gamma = self.cfg.getfloat('constants', 'gamma')
 
         # Pass boundary constants to the backend
         self._tpl_c['cpTt'], = self._eval_opts(['cpTt'])
-        self._tpl_c.update(self._exp_opts(['pt'], lhs))
+        self._tpl_c['pt'], = self._eval_opts(['pt'])
+#        self._tpl_c.update(self._exp_opts(['pt'], lhs))
         self._tpl_c['Rdcp'] = (gamma - 1.0)/gamma
 
         # Calculate u, v velocity components from the inflow angle
