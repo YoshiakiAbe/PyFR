@@ -88,17 +88,20 @@ class NavierStokesBaseBCInters(BaseAdvectionDiffusionBCInters):
         be.pointwise.register('pyfr.solvers.navstokes.kernels.bcconu')
         be.pointwise.register('pyfr.solvers.navstokes.kernels.bccflux')
 
+
         self.kernels['con_u'] = lambda: be.kernel(
             'bcconu', tplargs=tplargs, dims=[self.ninterfpts],
-            ulin=self._scal_lhs, ulout=self._vect_lhs,
-            nlin=self._norm_pnorm_lhs, ploc=self._ploc
-        )
+            extrns=self._external_args, ulin=self._scal_lhs,
+            ulout=self._vect_lhs, nlin=self._norm_pnorm_lhs,
+            **self._external_vals
+         )
         self.kernels['comm_flux'] = lambda: be.kernel(
             'bccflux', tplargs=tplargs, dims=[self.ninterfpts],
-            ul=self._scal_lhs, gradul=self._vect_lhs,
-            magnl=self._mag_pnorm_lhs, nl=self._norm_pnorm_lhs,
-            ploc=self._ploc, artviscl=self._artvisc_lhs
-        )
+            extrns=self._external_args, ul=self._scal_lhs,
+            gradul=self._vect_lhs, magnl=self._mag_pnorm_lhs,
+            nl=self._norm_pnorm_lhs, artviscl=self._artvisc_lhs,
+            **self._external_vals
+         )
 
 
 class NavierStokesNoSlpIsotWallBCInters(NavierStokesBaseBCInters):
@@ -150,7 +153,7 @@ class NavierStokesSupInflowBCInters(NavierStokesBaseBCInters):
 
 class NavierStokesSupOutflowBCInters(NavierStokesBaseBCInters):
     type = 'sup-out-fn'
-    cflux_state = 'ghost'
+    cflux_state = None
 
 
 class NavierStokesSubInflowFrvBCInters(NavierStokesBaseBCInters):
@@ -165,6 +168,56 @@ class NavierStokesSubInflowFrvBCInters(NavierStokesBaseBCInters):
             default={'u': 0, 'v': 0, 'w': 0}
         )
         self._tpl_c.update(tplc)
+
+        lagt = 0.1 # turbulent time scale
+        self.drt = 0.001 # time step size for random seed
+        dr = {'y':0.01,'z':0.01} # uni grid size of inlet plane for random seed
+        L  = {'y':0.7,'z':0.7} # inlet plane size
+        cmin  = {'y':0.0,'z':0.0} # inlet plane min y / z
+        cmax  = {'y':2.0,'z':4.2} # inlet plane max y / z
+
+        MNf = 1
+        for ind in ['y','z']: # y-z plane
+            r1d = np.arange(cmin[ind], cmax[ind] + 0.5 * dr[ind], dr[ind])
+            n = int(L[ind] / dr[ind])
+            Nf = 2 * n # or >= 2
+            Mf = int(np.round((cmax[ind] - cmin[ind]) / dr[ind])) + 1
+            MNf = MNf * (Mf + 2 * Nf)
+
+            self._tpl_c['Nf' + ind] = Nf
+            self._tpl_c['Mf' + ind] = Mf
+            self._tpl_c['d' + ind + 'r'] = dr[ind]
+            self._tpl_c[ind + 'min'] = cmin[ind]
+            self._tpl_c['MNf' + ind] = Nf * 2 + Mf
+            bb = self._be.matrix((1, 2 * Nf + 1))
+            self._set_external('bb' + ind, 'in broadcast fpdtype_t[{0}]'.format(2 * Nf + 1), value=bb)
+    
+            bbtl = [np.exp(- np.pi * np.abs(k - Nf) / n) for k in np.arange(2 * Nf + 1)]
+            bbtls = np.sum([s * s for s in bbtl], axis=0)
+            self.bbtmp = bbtmp = np.array([[s / bbtls for s in bbtl]])
+            bb.set(bbtmp)        
+            
+        self.MNf = MNf
+        self._tpl_c['MNf'] = MNf
+        self.runi = runi = self._be.matrix((6, MNf))
+        self._set_external('runi', 'in broadcast fpdtype_t[{0}][{1}]'.format(6, MNf), value=runi)
+
+        testual = self._be.matrix((3, self.ninterfpts))
+        self._set_external('testual', 'inout fpdtype_t[3]', value=testual)
+
+        self._tpl_c['Coft'] = [np.exp(-0.5 * np.pi * self.drt / lagt), 
+                               np.sqrt(1.0 - np.exp(-np.pi * self.drt / lagt))]
+
+
+    def prepare(self, t):
+
+        senum = int(np.round(t / self.drt)) + 1 # "+1" is to avoid 0 at t = 0
+        np.random.seed(senum - 1) # need the previous t in subit...
+        runin0 = np.array([np.random.uniform(0., 1., self.MNf) - 0.5] * 3)
+        np.random.seed(senum)
+        runin1 = np.array([np.random.uniform(0., 1., self.MNf) - 0.5] * 3)
+        
+        self.runi.set(np.vstack((runin0, runin1)))
 
 
 class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
