@@ -9,10 +9,10 @@
 
 <% tau = c['ldg-tau'] %>
 
-<%pyfr:macro name='bc_impose_state' params='ul, nl, ur, ual_sp'>
+<%pyfr:macro name='bc_impose_state' params='ul, nl, ur, urand'>
     ur[0] = ${c['rho']};
 % for i, v in enumerate('uvw'[:ndims]):
-    ur[${i + 1}] = (${c['rho']}) * (${c[v]} + ual_sp[${i}]);
+    ur[${i + 1}] = (${c['rho']}) * (${c[v]} + urand[${i}]);
 % endfor
     ur[${nvars - 1}] = ul[${nvars - 1}]
                      - 0.5*(1.0/ul[0])*${pyfr.dot('ul[{i}]', i=(1, ndims + 1))}
@@ -21,7 +21,7 @@
 </%pyfr:macro>
 
 
-<%pyfr:macro name='bc_ldg_state' params='ul, nl, ur' externs='ploc, t, bby, bbz, runi, testual'>
+<%pyfr:macro name='bc_ldg_state' params='ul, nl, ur' externs='ploc, t, bby, bbz, runi, urand'>
     int inz = round((ploc[2] - ${c['zmin']}) / ${c['dzr']});
     int iny = round((ploc[1] - ${c['ymin']}) / ${c['dyr']});
 
@@ -55,24 +55,24 @@
     a22 = 0.1;
     a33 = 0.1;
 
-    testual[0] = 0.0;
-    testual[1] = 0.0;
-    testual[2] = 0.0;
+    urand[0] = 0.0;
+    urand[1] = 0.0;
+    urand[2] = 0.0;
 % for i, v in enumerate(c['Coft']):
-            testual[0] += ${v} * (a11 * ual_sp[${i}][0]);
-            testual[1] += ${v} * (a21 * ual_sp[${i}][0] + a22 * ual_sp[${i}][1]);
-            testual[2] += ${v} * (a33 * ual_sp[${i}][2]);
+            urand[0] += ${v} * (a11 * ual_sp[${i}][0]);
+            urand[1] += ${v} * (a21 * ual_sp[${i}][0] + a22 * ual_sp[${i}][1]);
+            urand[2] += ${v} * (a33 * ual_sp[${i}][2]);
 % endfor
 
-    ${pyfr.expand('bc_impose_state', 'ul', 'nl', 'ur', 'testual')};
+    ${pyfr.expand('bc_impose_state', 'ul', 'nl', 'ur', 'urand')};
 </%pyfr:macro>
 
 <%pyfr:alias name='bc_ldg_grad_state' func='bc_common_grad_zero'/>
 
-<%pyfr:macro name='bc_common_flux_state' params='ul, gradul, artviscl, nl, magnl' externs='ploc, t, bby, bbz, runi, testual'>
+<%pyfr:macro name='bc_common_flux_state' params='ul, gradul, artviscl, nl, magnl' externs='ploc, t, bby, bbz, runi, urand'>
     // Viscous states
     fpdtype_t ur[${nvars}], gradur[${ndims}][${nvars}];
-    ${pyfr.expand('bc_impose_state', 'ul', 'nl', 'ur', 'testual')};
+    ${pyfr.expand('bc_impose_state', 'ul', 'nl', 'ur', 'urand')};
     ${pyfr.expand('bc_ldg_grad_state', 'ul', 'nl', 'gradul', 'gradur')};
 
     fpdtype_t fvr[${ndims}][${nvars}] = {{0}};
