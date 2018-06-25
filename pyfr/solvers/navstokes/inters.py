@@ -222,30 +222,7 @@ class NavierStokesSubInflowFrvBCInters(NavierStokesBaseBCInters):
 
 class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
     type = 'sub-in-ftpttang'
-    #cflux_state = 'ghost'
     cflux_state = None
-
-    #def __init__(self, be, lhs, elemap, cfgsect, cfg):
-    #    super().__init__(be, lhs, elemap, cfgsect, cfg)
-    #
-    #    gamma = self.cfg.getfloat('constants', 'gamma')
-    #
-    #    # Pass boundary constants to the backend
-    #    self._tpl_c['cpTt'], = self._eval_opts(['cpTt'])
-    #    self._tpl_c.update(self._exp_opts(['pt'], lhs))
-    #    self._tpl_c['Rdcp'] = (gamma - 1.0)/gamma
-    #
-    #    # Calculate u, v velocity components from the inflow angle
-    #    theta = self._eval_opts(['theta'])[0]*np.pi/180.0
-    #    velcomps = np.array([np.cos(theta), np.sin(theta), 1.0])
-    #
-    #    # Adjust u, v and calculate w velocity components for 3-D
-    #    if self.ndims == 3:
-    #        phi = self._eval_opts(['phi'])[0]*np.pi/180.0
-    #        velcomps[:2] *= np.sin(phi)
-    #        velcomps[2] *= np.cos(phi)
-    #
-    #    self._tpl_c['vc'] = velcomps[:self.ndims]
 
     def __init__(self, be, lhs, elemap, cfgsect, cfg):
         super().__init__(be, lhs, elemap, cfgsect, cfg)
@@ -276,14 +253,19 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
         self._tpl_c['vc'] = velcomps[:self.ndims]
 
 
-        lagt = 0.1 # turbulent time scale
-        self.drt = 0.001 # time step size for random seed
-        dr = {'y':0.01,'z':0.01} # uni grid size of inlet plane for random seed
+        lagt = 0.01 # turbulent time scale
+        self.drt = 0.0001 # time step size for random seed
+        dr = {'y':0.005,'z':0.005} # uni grid size of inlet plane for random seed
         L  = {'y':0.7,'z':0.7} # inlet plane size
+        #lagt = 0.1 # turbulent time scale
+        #self.drt = 0.001 # time step size for random seed
+        #dr = {'y':0.01,'z':0.01} # uni grid size of inlet plane for random seed
+        #L  = {'y':0.7,'z':0.7} # inlet plane size
         cmin  = {'y':0.0,'z':0.0} # inlet plane min y / z
         cmax  = {'y':2.0,'z':4.2} # inlet plane max y / z
 
         MNf = 1 
+        self.Mf, self.Nf = {'y':0, 'z':0}, {'y':0, 'z':0}
         for ind in ['y','z']: # y-z plane
             r1d = np.arange(cmin[ind], cmax[ind] + 0.5 * dr[ind], dr[ind])
             n = int(L[ind] / dr[ind])
@@ -291,8 +273,8 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
             Mf = int(np.round((cmax[ind] - cmin[ind]) / dr[ind])) + 1
             MNf = MNf * (Mf + 2 * Nf)
 
-            self._tpl_c['Nf' + ind] = Nf
-            self._tpl_c['Mf' + ind] = Mf
+            self.Nf[ind] = self._tpl_c['Nf' + ind] = Nf
+            self.Mf[ind] = self._tpl_c['Mf' + ind] = Mf
             self._tpl_c['d' + ind + 'r'] = dr[ind]
             self._tpl_c[ind + 'min'] = cmin[ind]
             self._tpl_c['MNf' + ind] = Nf * 2 + Mf
@@ -319,10 +301,23 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
     def prepare(self, t):
 
         senum = int(np.round(t / self.drt)) + 1 # "+1" is to avoid 0 at t = 0
-        np.random.seed(senum - 1) # need the previous t in subit...
-        runin0 = np.array([np.random.uniform(0., 1., self.MNf) - 0.5] * 3)
-        np.random.seed(senum)
-        runin1 = np.array([np.random.uniform(0., 1., self.MNf) - 0.5] * 3)
+        runin0 = [[0.0]*(self.Mf['y'] + 2 * self.Nf['y'])*(self.Mf['z'] + 2 * self.Nf['z'])]*3
+        for i in range(3):
+            for ly in range(0, self.Mf['y']):
+                for lz in range(0, self.Mf['z']):
+                    np.random.seed((senum - 1, ly, lz, i)) # need the previous t in subit...
+                    runin0[i][lz * (self.Mf['y'] + 2 * self.Nf['y']) + ly + 1] = np.random.uniform(0., 1., 1) - 0.5
+        runin1 = [[0.0]*(self.Mf['y'] + 2 * self.Nf['y'])*(self.Mf['z'] + 2 * self.Nf['z'])]*3
+        for i in range(3):
+            for ly in range(0, self.Mf['y']):
+                for lz in range(0, self.Mf['z']):
+                    np.random.seed((senum, ly, lz, i)) # need the previous t in subit...
+                    runin1[i][lz * (self.Mf['y'] + 2 * self.Nf['y']) + ly + 1] = np.random.uniform(0., 1., 1) - 0.5
+
+        #np.random.seed(senum-1)
+        #runin0 = np.array([np.random.uniform(0., 1., self.MNf) - 0.5] * 3)
+        #np.random.seed(senum)
+        #runin1 = np.array([np.random.uniform(0., 1., self.MNf) - 0.5] * 3)
         
         self.runi.set(np.vstack((runin0, runin1)))
 
