@@ -264,7 +264,7 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
         cmin  = {'y':0.0,'z':0.0} # inlet plane min y / z
         cmax  = {'y':2.0,'z':4.2} # inlet plane max y / z
 
-        MNf = 1 
+        MNf = 1  # fixed constant
         self.Mf, self.Nf = {'y':0, 'z':0}, {'y':0, 'z':0}
         for ind in ['y','z']: # y-z plane
             r1d = np.arange(cmin[ind], cmax[ind] + 0.5 * dr[ind], dr[ind])
@@ -277,7 +277,7 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
             self.Mf[ind] = self._tpl_c['Mf' + ind] = Mf
             self._tpl_c['d' + ind + 'r'] = dr[ind]
             self._tpl_c[ind + 'min'] = cmin[ind]
-            self._tpl_c['MNf' + ind] = Nf * 2 + Mf
+            self._tpl_c['MNf' + ind] = Mf + 2 * Nf
             bb = self._be.matrix((1, 2 * Nf + 1))
             self._set_external('bb' + ind, 'in broadcast fpdtype_t[{0}]'.format(2 * Nf + 1), value=bb)
     
@@ -301,25 +301,46 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
     def prepare(self, t):
 
         senum = int(np.round(t / self.drt)) + 1 # "+1" is to avoid 0 at t = 0
-        runin0 = [[0.0]*(self.Mf['y'] + 2 * self.Nf['y'])*(self.Mf['z'] + 2 * self.Nf['z'])]*3
-        for i in range(3):
-            for ly in range(0, self.Mf['y']):
-                for lz in range(0, self.Mf['z']):
-                    np.random.seed((senum - 1, ly, lz, i)) # need the previous t in subit...
-                    runin0[i][lz * (self.Mf['y'] + 2 * self.Nf['y']) + ly + 1] = np.random.uniform(0., 1., 1) - 0.5
-        runin1 = [[0.0]*(self.Mf['y'] + 2 * self.Nf['y'])*(self.Mf['z'] + 2 * self.Nf['z'])]*3
-        for i in range(3):
-            for ly in range(0, self.Mf['y']):
-                for lz in range(0, self.Mf['z']):
-                    np.random.seed((senum, ly, lz, i)) # need the previous t in subit...
-                    runin1[i][lz * (self.Mf['y'] + 2 * self.Nf['y']) + ly + 1] = np.random.uniform(0., 1., 1) - 0.5
+
+        #np.random.seed(senum-1)
+        #runin0 = np.random.uniform(-0.5, 0.5, (3, self.MNf))
+        #np.random.seed(senum)
+        #runin1 = np.random.uniform(-0.5, 0.5, (3, self.MNf))
+        #self.runi.set(np.vstack((runin0, runin1)))
+
+        MNfy, MNfz = self.Mf['y'] + 2 * self.Nf['y'], self.Mf['z'] + 2 * self.Nf['z']
+        #runin0, runin1 = np.array([[0.0]*3]*self.MNf), np.array([[0.0]*3]*self.MNf)
+        runin0, runin1 = np.zeros((self.MNf, 3)), np.zeros((self.MNf, 3))
+        for ly in range(0, MNfy):
+            for lz in range(0, MNfz):
+                l = lz * MNfy + ly 
+                np.random.seed((senum - 1, ly, lz))
+                runin0[l] = np.random.uniform(-0.5, 0.5, 3)
+                np.random.seed((senum, ly, lz))
+                runin1[l] = np.random.uniform(-0.5, 0.5, 3)
+        runin0 = runin0.swapaxes(0, 1)
+        runin1 = runin1.swapaxes(0, 1)
+        self.runi.set(np.vstack((runin0, runin1)))
+
+        #runin0 = [[0.0]*(self.Mf['y'] + 2 * self.Nf['y'])*(self.Mf['z'] + 2 * self.Nf['z'])]*3
+        #for i in range(3):
+        #    for ly in range(0, self.Mf['y']):
+        #        for lz in range(0, self.Mf['z']):
+        #            np.random.seed((senum - 1, ly, lz, i)) # need the previous t in subit...
+        #            runin0[i][lz * (self.Mf['y'] + 2 * self.Nf['y']) + ly + 1] = np.random.uniform(0., 1., 1) - 0.5
+        #runin1 = [[0.0]*(self.Mf['y'] + 2 * self.Nf['y'])*(self.Mf['z'] + 2 * self.Nf['z'])]*3
+        #for i in range(3):
+        #    for ly in range(0, self.Mf['y']):
+        #        for lz in range(0, self.Mf['z']):
+        #            np.random.seed((senum, ly, lz, i)) # need the previous t in subit...
+        #            runin1[i][lz * (self.Mf['y'] + 2 * self.Nf['y']) + ly + 1] = np.random.uniform(0., 1., 1) - 0.5
+        #self.runi.set(np.vstack((runin0, runin1)))
 
         #np.random.seed(senum-1)
         #runin0 = np.array([np.random.uniform(0., 1., self.MNf) - 0.5] * 3)
         #np.random.seed(senum)
         #runin1 = np.array([np.random.uniform(0., 1., self.MNf) - 0.5] * 3)
-        
-        self.runi.set(np.vstack((runin0, runin1)))
+        #self.runi.set(np.vstack((runin0, runin1)))
 
 
 class NavierStokesSubOutflowBCInters(NavierStokesBaseBCInters):
