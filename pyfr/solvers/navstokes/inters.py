@@ -255,7 +255,7 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
 
         lagt = 0.01 # turbulent time scale
         self.drt = 0.0001 # time step size for random seed
-        dr = {'y':0.005,'z':0.005} # uni grid size of inlet plane for random seed
+        dr = {'y':0.01,'z':0.01} # uni grid size of inlet plane for random seed
         L  = {'y':0.7,'z':0.7} # inlet plane size
         #lagt = 0.1 # turbulent time scale
         #self.drt = 0.001 # time step size for random seed
@@ -301,26 +301,40 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
     def prepare(self, t):
 
         senum = int(np.round(t / self.drt)) + 1 # "+1" is to avoid 0 at t = 0
+        np.random.seed(senum - 1)
+        runin0 = np.random.uniform(-0.5, 0.5, (3, self.MNf))
+        np.random.seed(senum)
+        runin1 = np.random.uniform(-0.5, 0.5, (3, self.MNf))
+        self.runi.set(np.vstack((runin0, runin1)))
 
-        #np.random.seed(senum-1)
-        #runin0 = np.random.uniform(-0.5, 0.5, (3, self.MNf))
-        #np.random.seed(senum)
-        #runin1 = np.random.uniform(-0.5, 0.5, (3, self.MNf))
+        #MNfy, MNfz = self.Mf['y'] + 2 * self.Nf['y'], self.Mf['z'] + 2 * self.Nf['z']
+        #runin0, runin1 = np.zeros((self.MNf, 3)), np.zeros((self.MNf, 3))
+        #for ly in range(0, MNfy):
+        #    ls = ly * MNfz + 0
+        #    le = ly * MNfz + MNfz - 1
+        #    np.random.seed((senum - 1, ly))
+        #    tmp = np.random.uniform(-0.5, 0.5, (MNfz, 3))
+        #    runin0[ls : le + 1] = tmp[0 : MNfz]
+        #    np.random.seed((senum, ly))
+        #    tmp = np.random.uniform(-0.5, 0.5, (MNfz, 3))
+        #    runin1[ls : le + 1] = tmp[0 : MNfz]
+        #runin0 = runin0.swapaxes(0, 1)
+        #runin1 = runin1.swapaxes(0, 1)
         #self.runi.set(np.vstack((runin0, runin1)))
 
-        MNfy, MNfz = self.Mf['y'] + 2 * self.Nf['y'], self.Mf['z'] + 2 * self.Nf['z']
-        #runin0, runin1 = np.array([[0.0]*3]*self.MNf), np.array([[0.0]*3]*self.MNf)
-        runin0, runin1 = np.zeros((self.MNf, 3)), np.zeros((self.MNf, 3))
-        for ly in range(0, MNfy):
-            for lz in range(0, MNfz):
-                l = lz * MNfy + ly 
-                np.random.seed((senum - 1, ly, lz))
-                runin0[l] = np.random.uniform(-0.5, 0.5, 3)
-                np.random.seed((senum, ly, lz))
-                runin1[l] = np.random.uniform(-0.5, 0.5, 3)
-        runin0 = runin0.swapaxes(0, 1)
-        runin1 = runin1.swapaxes(0, 1)
-        self.runi.set(np.vstack((runin0, runin1)))
+
+        #MNfy, MNfz = self.Mf['y'] + 2 * self.Nf['y'], self.Mf['z'] + 2 * self.Nf['z']
+        #runin0, runin1 = np.zeros((self.MNf, 3)), np.zeros((self.MNf, 3))
+        #for ly in range(0, MNfy):
+        #    for lz in range(0, MNfz):
+        #        l = lz * MNfy + ly 
+        #        np.random.seed((senum - 1, ly, lz))
+        #        runin0[l] = np.random.uniform(-0.5, 0.5, 3)
+        #        np.random.seed((senum, ly, lz))
+        #        runin1[l] = np.random.uniform(-0.5, 0.5, 3)
+        #runin0 = runin0.swapaxes(0, 1)
+        #runin1 = runin1.swapaxes(0, 1)
+        #self.runi.set(np.vstack((runin0, runin1)))
 
         #runin0 = [[0.0]*(self.Mf['y'] + 2 * self.Nf['y'])*(self.Mf['z'] + 2 * self.Nf['z'])]*3
         #for i in range(3):

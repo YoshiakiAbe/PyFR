@@ -10,8 +10,8 @@
 <% tau = c['ldg-tau'] %>
 
 <%pyfr:macro name='bc_impose_state' params='ul, nl, ur, urand'>
-    fpdtype_t pl = ${c['gamma'] - 1.0}*(ul[${nvars - 1}]
-                 - (0.5/ul[0])*${pyfr.dot('ul[{i}]', i=(1, ndims + 1))});
+    fpdtype_t pl = ${c['gamma'] - 1.0} * (ul[${nvars - 1}]
+                 - (0.5 / ul[0]) * ${pyfr.dot('ul[{i}]', i=(1, ndims + 1))});
     fpdtype_t pt = (${c['pt']});
     pt = (pt > pl ? pt : pl);
 
@@ -36,13 +36,13 @@
 
     for (int l = 0; l < 2; l++) {
             for (int k = 0; k < 3; k++) {
-                    for (int j = 0; j < ${c['Nfz']}*2 + 1; j++) {
+                    for (int i = 0; i < ${c['Nfy']}*2 + 1; i++) {	
                             fpdtype_t tmp = 0.0;
                             #pragma unroll
-                            for (int i = 0; i < ${c['Nfy']}*2 + 1; i++) {
-    		                        tmp += bby[i] * runi[3 * l + k][(inz + j) * ${c['MNfy']} + iny + i];
+                            for (int j = 0; j < ${c['Nfz']}*2 + 1; j++) {
+    		                        tmp += bby[j] * runi[3 * l + k][(iny + i) * ${c['MNfz']} + inz + j];
     	                    }
-                            ual_sp[l][k] += bbz[j]*tmp;
+                            ual_sp[l][k] += bbz[i]*tmp;
                     }
             }
     }
