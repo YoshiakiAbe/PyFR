@@ -29,13 +29,13 @@
 
     for (int l = 0; l < 2; l++) {
             for (int k = 0; k < 3; k++) {
-                    for (int j = 0; j < ${c['Nfz']}*2 + 1; j++) {
+                    for (int i = 0; i < ${c['Nfy']}*2 + 1; i++) {	
                             fpdtype_t tmp = 0.0;
                             #pragma unroll
-                            for (int i = 0; i < ${c['Nfy']}*2 + 1; i++) {
-    		                        tmp += bby[i] * runi[3 * l + k][(inz + j) * ${c['MNfy']} + iny + i];
+                            for (int j = 0; j < ${c['Nfz']}*2 + 1; j++) {
+    		                        tmp += bby[j] * runi[3 * l + k][(iny + i) * ${c['MNfz']} + inz + j];
     	                    }
-                            ual_sp[l][k] += bbz[j]*tmp;
+                            ual_sp[l][k] += bbz[i]*tmp;
                     }
             }
     }
@@ -50,10 +50,10 @@
     fpdtype_t a22 = sqrt(R22 - (R21 / sqrt(R11)) * (R21 / sqrt(R11)));
     fpdtype_t a33 = sqrt(R33);
 
-    a11 = 0.1;
+    a11 = 5.0;
     a21 = 0.0;
-    a22 = 0.1;
-    a33 = 0.1;
+    a22 = 5.0;
+    a33 = 5.0;
 
     urand[0] = 0.0;
     urand[1] = 0.0;
