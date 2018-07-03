@@ -171,7 +171,7 @@ class NavierStokesSubInflowFrvBCInters(NavierStokesBaseBCInters):
 
         lagt = 0.1 # turbulent time scale
         self.drt = 0.001 # time step size for random seed
-        dr = {'y':0.01,'z':0.01} # uni grid size of inlet plane for random seed
+        dr = {'y':0.005,'z':0.005} # uni grid size of inlet plane for random seed
         L  = {'y':0.7,'z':0.7} # inlet plane size
         cmin  = {'y':0.0,'z':0.0} # inlet plane min y / z
         cmax  = {'y':2.0,'z':4.2} # inlet plane max y / z
@@ -212,12 +212,18 @@ class NavierStokesSubInflowFrvBCInters(NavierStokesBaseBCInters):
     def prepare(self, t):
 
         senum = int(np.round(t / self.drt)) + 1 # "+1" is to avoid 0 at t = 0
-        np.random.seed(senum - 1) # need the previous t in subit...
-        runin0 = np.array([np.random.uniform(0., 1., self.MNf) - 0.5] * 3)
+        np.random.seed(senum - 1)
+        runin0 = np.random.uniform(-0.5, 0.5, (3, self.MNf))
         np.random.seed(senum)
-        runin1 = np.array([np.random.uniform(0., 1., self.MNf) - 0.5] * 3)
-        
+        runin1 = np.random.uniform(-0.5, 0.5, (3, self.MNf))
         self.runi.set(np.vstack((runin0, runin1)))
+
+        #senum = int(np.round(t / self.drt)) + 1 # "+1" is to avoid 0 at t = 0
+        #np.random.seed(senum - 1) # need the previous t in subit...
+        #runin0 = np.array([np.random.uniform(0., 1., self.MNf) - 0.5] * 3)
+        #np.random.seed(senum)
+        #runin1 = np.array([np.random.uniform(0., 1., self.MNf) - 0.5] * 3)
+        #self.runi.set(np.vstack((runin0, runin1)))
 
 
 class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
@@ -227,18 +233,12 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
     def __init__(self, be, lhs, elemap, cfgsect, cfg):
         super().__init__(be, lhs, elemap, cfgsect, cfg)
 
-        #tplc = self._exp_opts(
-        #    ['rho', 'u', 'v', 'w'][:self.ndims + 1], lhs,
-        #    default={'u': 0, 'v': 0, 'w': 0}
-        #)
-        #self._tpl_c.update(tplc)
-
         gamma = self.cfg.getfloat('constants', 'gamma')
 
         # Pass boundary constants to the backend
         self._tpl_c['cpTt'], = self._eval_opts(['cpTt'])
         self._tpl_c.update(self._exp_opts(['pt'], lhs))
-        self._tpl_c['Rdcp'] = (gamma - 1.0)/gamma
+        self._tpl_c['Rdcp'] = (gamma - 1.0) / gamma
 
         # Calculate u, v velocity components from the inflow angle
         theta = self._eval_opts(['theta'])[0]*np.pi/180.0
@@ -246,38 +246,93 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
 
         # Adjust u, v and calculate w velocity components for 3-D
         if self.ndims == 3:
-            phi = self._eval_opts(['phi'])[0]*np.pi/180.0
+            phi = self._eval_opts(['phi'])[0] * np.pi / 180.0
             velcomps[:2] *= np.sin(phi)
             velcomps[2] *= np.cos(phi)
 
         self._tpl_c['vc'] = velcomps[:self.ndims]
 
-
         lagt = 0.01 # turbulent time scale
         self.drt = 0.0001 # time step size for random seed
-        dr = {'y':0.01,'z':0.01} # uni grid size of inlet plane for random seed
-        L  = {'y':0.7,'z':0.7} # inlet plane size
-        #lagt = 0.1 # turbulent time scale
-        #self.drt = 0.001 # time step size for random seed
-        #dr = {'y':0.01,'z':0.01} # uni grid size of inlet plane for random seed
-        #L  = {'y':0.7,'z':0.7} # inlet plane size
-        cmin  = {'y':0.0,'z':0.0} # inlet plane min y / z
-        cmax  = {'y':2.0,'z':4.2} # inlet plane max y / z
+        dr = {'y':0.01, 'z':0.01} # uni grid size of inlet plane for random seed
+        L  = {'y':0.7, 'z':0.7} # inlet plane size
+        cmin  = {'y':0.0, 'z':0.0} # inlet plane min y / z
+        cmax  = {'y':2.0, 'z':4.2} # inlet plane max y / z
 
-        MNf = 1  # fixed constant
+        # xyzfpts = (xyz, nface, fpts) => (xyz, 1d)
+        xyzfpts = np.array([elemap[etype].get_ploc_for_inter(eidx,fidx) 
+                            for etype, eidx, fidx, flags in lhs]).swapaxes(0,2).reshape(3, -1)
+        xyzfpts_mins = {s:min(t) for s,t in zip(['x','y','z'], xyzfpts)}
+        xyzfpts_maxs = {s:max(t) for s,t in zip(['x','y','z'], xyzfpts)}
+
+        #print(xyzfpts_mins)
+
+        #xyzfpts[xyzfpts[:][:][i].reshape(-1) for i in range(3)]
+        #xfpts, yfpts, zfpts = 
+        #print(np.array(xyzfps).shape)
+
+        #from pyfr.solvers.navstokes.system import NavierStokesSystem
+        #from pyfr.readers.native import NativeReader
+        ##print(NativeReader.array_info('channel.pyfrm','spts'))
+        #print(dir(NativeReader))
+        #print(dir(elemap['hex']))
+        #print(elemap['hex'].nfpts)
+        #print(elemap['hex'].nfacefpts)
+        #print(elemap['hex'].get_ploc_for_inter(3,3))
+        #quit()
+        #from pyfr.solvers.navstokes import inters
+        #from pyfr.solvers import navstokes
+        ##print(dir(NativeReader))
+        ##print(dir(inters))
+        #print(dir(navstokes.system.NavierStokesSystem))
+        #print(navstokes.system.NavierStokesSystem._load_bc_inters(self, rallocs, mesh, elemap))
+        #quit()
+        #from pyfr.solvers.navstokes.system import NavierStokesSystem
+        #print(NavierStokesSystem.name)
+        #quit()
+        # for test
+        #self.gpts = elemap['hex'].eles
+        #self.upts = elemap['hex'].ploc_at_np('upts')        
+        #print(elemap['hex'].eles.shape)
+        #print(elemap['hex'].ploc_at_np('upts').shape)
+        #print(elemap['hex'].ploc_at_np('fpts').shape)
+        #for a in elemap.keys():
+        #    print(a)
+        #print(cfgsect,elemap)
+        #print(dir(elemap['hex']))
+        #print(elemap['hex'].plocfpts.shape)
+        #print(dir(self.elemap['hex']))
+        #print(self.elemap['hex'].get_ploc_for_inter(3,3).shape)
+        #self.fpts = elemap['hex'].ploc_at_np('fpts').swapaxes(0, 1) # (xyz, fp, cell)
+        ##print(self.fpts[0])
+        #print(max(self.fpts[1].reshape(-1)))
+        #print(self.fpts.shape)
+        #quit()
+
+        MNf, mnflim = 1, 1  # fixed constant
         self.Mf, self.Nf = {'y':0, 'z':0}, {'y':0, 'z':0}
-        for ind in ['y','z']: # y-z plane
+        self.mfmin, self.mfmax = {'y':0, 'z':0}, {'y':0, 'z':0}
+        self.mnflim_e = {'y':0, 'z':0}
+        for ind in ['y', 'z']: # y-z plane
             r1d = np.arange(cmin[ind], cmax[ind] + 0.5 * dr[ind], dr[ind])
             n = int(L[ind] / dr[ind])
             Nf = 2 * n # or >= 2
             Mf = int(np.round((cmax[ind] - cmin[ind]) / dr[ind])) + 1
             MNf = MNf * (Mf + 2 * Nf)
+            mfmin = int(np.round((xyzfpts_mins[ind] - cmin[ind]) / dr[ind]))
+            mfmax = int(np.round((xyzfpts_maxs[ind] - cmin[ind]) / dr[ind]))
+            mnflim = mnflim * ((mfmax - mfmin + 1) + 2 * Nf)
 
             self.Nf[ind] = self._tpl_c['Nf' + ind] = Nf
             self.Mf[ind] = self._tpl_c['Mf' + ind] = Mf
+            self.mfmin[ind] = mfmin
+            self.mfmax[ind] = mfmax
+            self.mnflim_e[ind] = (mfmax - mfmin + 1) + 2 * Nf
+
             self._tpl_c['d' + ind + 'r'] = dr[ind]
             self._tpl_c[ind + 'min'] = cmin[ind]
             self._tpl_c['MNf' + ind] = Mf + 2 * Nf
+            self._tpl_c['mnflim_e' + ind] = self.mnflim_e[ind]
             bb = self._be.matrix((1, 2 * Nf + 1))
             self._set_external('bb' + ind, 'in broadcast fpdtype_t[{0}]'.format(2 * Nf + 1), value=bb)
     
@@ -286,10 +341,10 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
             self.bbtmp = bbtmp = np.array([[s / bbtls for s in bbtl]])
             bb.set(bbtmp)        
             
-        self.MNf = MNf
-        self._tpl_c['MNf'] = MNf
-        self.runi = runi = self._be.matrix((6, MNf))
-        self._set_external('runi', 'in broadcast fpdtype_t[{0}][{1}]'.format(6, MNf), value=runi)
+        self.MNf = self._tpl_c['MNf'] = MNf
+        self.mnflim = mnflim
+        self.runi = runi = self._be.matrix((6, self.mnflim))
+        self._set_external('runi', 'in broadcast fpdtype_t[{0}][{1}]'.format(6, self.mnflim), value=runi)
 
         urand = self._be.matrix((3, self.ninterfpts))
         self._set_external('urand', 'inout fpdtype_t[3]', value=urand)
@@ -297,15 +352,30 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
         self._tpl_c['Coft'] = [np.exp(-0.5 * np.pi * self.drt / lagt), 
                                np.sqrt(1.0 - np.exp(-np.pi * self.drt / lagt))]
 
-
     def prepare(self, t):
 
+        #senum = int(np.round(t / self.drt)) + 1 # "+1" is to avoid 0 at t = 0
+        #np.random.seed(senum - 1)
+        #runin0 = np.random.uniform(-0.5, 0.5, (3, self.MNf))
+        #np.random.seed(senum)
+        #runin1 = np.random.uniform(-0.5, 0.5, (3, self.MNf))
+        #print(runin0.shape)
+        #self.runi.set(np.vstack((runin0, runin1)))
+        
+        MNfy, MNfz = self.Mf['y'] + 2 * self.Nf['y'], self.Mf['z'] + 2 * self.Nf['z']
+        runins = []
         senum = int(np.round(t / self.drt)) + 1 # "+1" is to avoid 0 at t = 0
-        np.random.seed(senum - 1)
-        runin0 = np.random.uniform(-0.5, 0.5, (3, self.MNf))
-        np.random.seed(senum)
-        runin1 = np.random.uniform(-0.5, 0.5, (3, self.MNf))
-        self.runi.set(np.vstack((runin0, runin1)))
+        for i, sn in enumerate([senum - 1, senum]):
+            runin = np.zeros((self.mnflim, 3))
+            for ly in range(self.mfmin['y'], self.mfmax['y'] + 2 * self.Nf['y'] + 1):
+                np.random.seed((sn, ly))
+                tmp = np.random.uniform(-0.5, 0.5, (MNfz, 3))
+                ls = (ly - self.mfmin['y']) * self.mnflim_e['z'] + 0
+                le = (ly - self.mfmin['y']) * self.mnflim_e['z'] + self.mnflim_e['z'] - 1
+                runin[ls : le + 1] = tmp[self.mfmin['z'] : self.mfmax['z'] + 2 * self.Nf['z'] + 1]
+            runins.append(runin.swapaxes(0, 1))
+        self.runi.set(np.vstack((runins[0], runins[1])))
+
 
         #MNfy, MNfz = self.Mf['y'] + 2 * self.Nf['y'], self.Mf['z'] + 2 * self.Nf['z']
         #runin0, runin1 = np.zeros((self.MNf, 3)), np.zeros((self.MNf, 3))

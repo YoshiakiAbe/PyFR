@@ -40,7 +40,7 @@
                             fpdtype_t tmp = 0.0;
                             #pragma unroll
                             for (int j = 0; j < ${c['Nfz']}*2 + 1; j++) {
-    		                        tmp += bby[j] * runi[3 * l + k][(iny + i) * ${c['MNfz']} + inz + j];
+    		                        tmp += bby[j] * runi[3 * l + k][(iny + i) * ${c['mnflim_ez']} + inz + j];
     	                    }
                             ual_sp[l][k] += bbz[i]*tmp;
                     }
@@ -57,10 +57,10 @@
     fpdtype_t a22 = sqrt(R22 - (R21 / sqrt(R11)) * (R21 / sqrt(R11)));
     fpdtype_t a33 = sqrt(R33);
 
-    a11 = 1.0;
+    a11 = 5.0;
     a21 = 0.0;
-    a22 = 1.0;
-    a33 = 1.0;
+    a22 = 5.0;
+    a33 = 5.0;
 
     urand[0] = 0.0;
     urand[1] = 0.0;
