@@ -40,9 +40,9 @@
                             fpdtype_t tmp = 0.0;
                             #pragma unroll
                             for (int j = 0; j < ${c['Nfz']}*2 + 1; j++) {
-    		                        tmp += bby[j] * runi[3 * l + k][(iny + i) * ${c['mnflim_ez']} + inz + j];
+    		                        tmp += bbz[j] * runi[3 * l + k][(iny + i) * ${c['mnflim_ez']} + inz + j];
     	                    }
-                            ual_sp[l][k] += bbz[i]*tmp;
+                            ual_sp[l][k] += bby[i]*tmp;
                     }
             }
     }

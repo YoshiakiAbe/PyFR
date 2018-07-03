@@ -171,10 +171,14 @@ class NavierStokesSubInflowFrvBCInters(NavierStokesBaseBCInters):
 
         lagt = 0.1 # turbulent time scale
         self.drt = 0.001 # time step size for random seed
+        #dr = {'y':0.005,'z':0.005} # uni grid size of inlet plane for random seed
+        #L  = {'y':0.7,'z':0.7} # inlet plane size
+        #cmin  = {'y':0.0,'z':0.0} # inlet plane min y / z
+        #cmax  = {'y':2.0,'z':4.2} # inlet plane max y / z
         dr = {'y':0.005,'z':0.005} # uni grid size of inlet plane for random seed
         L  = {'y':0.7,'z':0.7} # inlet plane size
-        cmin  = {'y':0.0,'z':0.0} # inlet plane min y / z
-        cmax  = {'y':2.0,'z':4.2} # inlet plane max y / z
+        cmin  = {'y':-0.587872982,'z':-1.14391935} # inlet plane min y / z
+        cmax  = {'y':0.367873043,'z':1.14391935} # inlet plane max y / z
 
         MNf = 1
         for ind in ['y','z']: # y-z plane
@@ -264,51 +268,8 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
                             for etype, eidx, fidx, flags in lhs]).swapaxes(0,2).reshape(3, -1)
         xyzfpts_mins = {s:min(t) for s,t in zip(['x','y','z'], xyzfpts)}
         xyzfpts_maxs = {s:max(t) for s,t in zip(['x','y','z'], xyzfpts)}
-
-        #print(xyzfpts_mins)
-
-        #xyzfpts[xyzfpts[:][:][i].reshape(-1) for i in range(3)]
-        #xfpts, yfpts, zfpts = 
-        #print(np.array(xyzfps).shape)
-
-        #from pyfr.solvers.navstokes.system import NavierStokesSystem
-        #from pyfr.readers.native import NativeReader
-        ##print(NativeReader.array_info('channel.pyfrm','spts'))
-        #print(dir(NativeReader))
-        #print(dir(elemap['hex']))
-        #print(elemap['hex'].nfpts)
-        #print(elemap['hex'].nfacefpts)
-        #print(elemap['hex'].get_ploc_for_inter(3,3))
+        print(xyzfpts_mins['y'],xyzfpts_maxs['y'],xyzfpts_mins['z'],xyzfpts_maxs['z'])
         #quit()
-        #from pyfr.solvers.navstokes import inters
-        #from pyfr.solvers import navstokes
-        ##print(dir(NativeReader))
-        ##print(dir(inters))
-        #print(dir(navstokes.system.NavierStokesSystem))
-        #print(navstokes.system.NavierStokesSystem._load_bc_inters(self, rallocs, mesh, elemap))
-        #quit()
-        #from pyfr.solvers.navstokes.system import NavierStokesSystem
-        #print(NavierStokesSystem.name)
-        #quit()
-        # for test
-        #self.gpts = elemap['hex'].eles
-        #self.upts = elemap['hex'].ploc_at_np('upts')        
-        #print(elemap['hex'].eles.shape)
-        #print(elemap['hex'].ploc_at_np('upts').shape)
-        #print(elemap['hex'].ploc_at_np('fpts').shape)
-        #for a in elemap.keys():
-        #    print(a)
-        #print(cfgsect,elemap)
-        #print(dir(elemap['hex']))
-        #print(elemap['hex'].plocfpts.shape)
-        #print(dir(self.elemap['hex']))
-        #print(self.elemap['hex'].get_ploc_for_inter(3,3).shape)
-        #self.fpts = elemap['hex'].ploc_at_np('fpts').swapaxes(0, 1) # (xyz, fp, cell)
-        ##print(self.fpts[0])
-        #print(max(self.fpts[1].reshape(-1)))
-        #print(self.fpts.shape)
-        #quit()
-
         MNf, mnflim = 1, 1  # fixed constant
         self.Mf, self.Nf = {'y':0, 'z':0}, {'y':0, 'z':0}
         self.mfmin, self.mfmax = {'y':0, 'z':0}, {'y':0, 'z':0}
@@ -330,7 +291,7 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
             self.mnflim_e[ind] = (mfmax - mfmin + 1) + 2 * Nf
 
             self._tpl_c['d' + ind + 'r'] = dr[ind]
-            self._tpl_c[ind + 'min'] = cmin[ind]
+            self._tpl_c[ind + 'min'] = xyzfpts_mins[ind] #cmin[ind]
             self._tpl_c['MNf' + ind] = Mf + 2 * Nf
             self._tpl_c['mnflim_e' + ind] = self.mnflim_e[ind]
             bb = self._be.matrix((1, 2 * Nf + 1))
