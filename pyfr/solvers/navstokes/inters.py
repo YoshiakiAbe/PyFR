@@ -170,13 +170,11 @@ class NavierStokesSubInflowFrvBCInters(NavierStokesBaseBCInters):
         self._tpl_c.update(tplc)
 
         lagt = 0.1 # turbulent time scale
-        self.drt = 0.001 # time step size for random seed
+        #self.drt = 0.001 # time step size for random seed
         #dr = {'y':0.005,'z':0.005} # uni grid size of inlet plane for random seed
-        #L  = {'y':0.7,'z':0.7} # inlet plane size
-        #cmin  = {'y':0.0,'z':0.0} # inlet plane min y / z
-        #cmax  = {'y':2.0,'z':4.2} # inlet plane max y / z
-        dr = {'y':0.005,'z':0.005} # uni grid size of inlet plane for random seed
-        L  = {'y':0.7,'z':0.7} # inlet plane size
+        self.drt = 0.0001 # time step size for random seed
+        dr = {'y':0.001,'z':0.001} # uni grid size of inlet plane for random seed
+        L  = {'y':5.0,'z':5.0} # correlation length
         cmin  = {'y':-0.587872982,'z':-1.14391935} # inlet plane min y / z
         cmax  = {'y':0.367873043,'z':1.14391935} # inlet plane max y / z
 
@@ -200,7 +198,7 @@ class NavierStokesSubInflowFrvBCInters(NavierStokesBaseBCInters):
             bbtls = np.sum([s * s for s in bbtl], axis=0)
             self.bbtmp = bbtmp = np.array([[s / bbtls for s in bbtl]])
             bb.set(bbtmp)        
-            
+
         self.MNf = MNf
         self._tpl_c['MNf'] = MNf
         self.runi = runi = self._be.matrix((6, MNf))
@@ -256,20 +254,22 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
 
         self._tpl_c['vc'] = velcomps[:self.ndims]
 
+        #lagt = 0.01 # turbulent time scale
+        #self.drt = 0.0001 # time step size for random seed
+        #dr = {'y':0.001,'z':0.001} # uni grid size of inlet plane for random seed
+        #L  = {'y':5.0,'z':5.0} # correlation length
         lagt = 0.01 # turbulent time scale
         self.drt = 0.0001 # time step size for random seed
-        dr = {'y':0.01, 'z':0.01} # uni grid size of inlet plane for random seed
-        L  = {'y':0.7, 'z':0.7} # inlet plane size
-        cmin  = {'y':0.0, 'z':0.0} # inlet plane min y / z
-        cmax  = {'y':2.0, 'z':4.2} # inlet plane max y / z
+        dr = {'y':0.001,'z':0.001} # uni grid size of inlet plane for random seed
+        L  = {'y':0.1,'z':0.1} # correlation length
+        cmin  = {'y':-0.587872982,'z':-1.14391935} # inlet plane min y / z
+        cmax  = {'y':0.367873043,'z':1.14391935} # inlet plane max y / z
 
         # xyzfpts = (xyz, nface, fpts) => (xyz, 1d)
         xyzfpts = np.array([elemap[etype].get_ploc_for_inter(eidx,fidx) 
                             for etype, eidx, fidx, flags in lhs]).swapaxes(0,2).reshape(3, -1)
         xyzfpts_mins = {s:min(t) for s,t in zip(['x','y','z'], xyzfpts)}
         xyzfpts_maxs = {s:max(t) for s,t in zip(['x','y','z'], xyzfpts)}
-        print(xyzfpts_mins['y'],xyzfpts_maxs['y'],xyzfpts_mins['z'],xyzfpts_maxs['z'])
-        #quit()
         MNf, mnflim = 1, 1  # fixed constant
         self.Mf, self.Nf = {'y':0, 'z':0}, {'y':0, 'z':0}
         self.mfmin, self.mfmax = {'y':0, 'z':0}, {'y':0, 'z':0}
@@ -323,20 +323,22 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
         #print(runin0.shape)
         #self.runi.set(np.vstack((runin0, runin1)))
         
-        MNfy, MNfz = self.Mf['y'] + 2 * self.Nf['y'], self.Mf['z'] + 2 * self.Nf['z']
+        MNfz = self.Mf['z'] + 2 * self.Nf['z']
         runins = []
         senum = int(np.round(t / self.drt)) + 1 # "+1" is to avoid 0 at t = 0
+        lymax = self.mfmax['y'] + 2 * self.Nf['y']
+        lyseed = np.hstack((np.arange(0, self.Mf['y']), np.arange(0, 2 * self.Nf['y'] + 1)))
         for i, sn in enumerate([senum - 1, senum]):
             runin = np.zeros((self.mnflim, 3))
-            for ly in range(self.mfmin['y'], self.mfmax['y'] + 2 * self.Nf['y'] + 1):
-                np.random.seed((sn, ly))
+            for ly in range(self.mfmin['y'], lymax + 1):
+                np.random.seed((sn, lyseed[ly]))
                 tmp = np.random.uniform(-0.5, 0.5, (MNfz, 3))
                 ls = (ly - self.mfmin['y']) * self.mnflim_e['z'] + 0
                 le = (ly - self.mfmin['y']) * self.mnflim_e['z'] + self.mnflim_e['z'] - 1
                 runin[ls : le + 1] = tmp[self.mfmin['z'] : self.mfmax['z'] + 2 * self.Nf['z'] + 1]
             runins.append(runin.swapaxes(0, 1))
         self.runi.set(np.vstack((runins[0], runins[1])))
-
+        
 
         #MNfy, MNfz = self.Mf['y'] + 2 * self.Nf['y'], self.Mf['z'] + 2 * self.Nf['z']
         #runin0, runin1 = np.zeros((self.MNf, 3)), np.zeros((self.MNf, 3))
