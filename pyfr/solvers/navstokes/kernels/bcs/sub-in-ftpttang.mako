@@ -28,24 +28,7 @@
 </%pyfr:macro>
 
 
-<%pyfr:macro name='bc_ldg_state' params='ul, nl, ur' externs='ploc, t, bby, bbz, runi, urand'>
-    int inz = round((ploc[2] - ${c['zmin']}) / ${c['dzr']});
-    int iny = round((ploc[1] - ${c['ymin']}) / ${c['dyr']});
-
-    fpdtype_t ual_sp[2][3] = {{0.0}};
-
-    for (int l = 0; l < 2; l++) {
-            for (int k = 0; k < 3; k++) {
-                    for (int i = 0; i < ${c['Nfy']}*2 + 1; i++) {	
-                            fpdtype_t tmp = 0.0;
-                            #pragma unroll
-                            for (int j = 0; j < ${c['Nfz']}*2 + 1; j++) {
-    		                        tmp += bbz[j] * runi[3 * l + k][(iny + i) * ${c['mnflim_ez']} + inz + j];
-    	                    }
-                            ual_sp[l][k] += bby[i]*tmp;
-                    }
-            }
-    }
+<%pyfr:macro name='bc_ldg_state' params='ul, nl, ur' externs='ploc, t, urand, ufpts'>
 
     fpdtype_t R11 = 0.05;
     fpdtype_t R21 = 0.05;
@@ -65,10 +48,11 @@
     urand[0] = 0.0;
     urand[1] = 0.0;
     urand[2] = 0.0;
+
 % for i, v in enumerate(c['Coft']):
-            urand[0] += ${v} * (a11 * ual_sp[${i}][0]);
-            urand[1] += ${v} * (a21 * ual_sp[${i}][0] + a22 * ual_sp[${i}][1]);
-            urand[2] += ${v} * (a33 * ual_sp[${i}][2]);
+            urand[0] += ${v} * (a11 * ufpts[${i} * 3]);
+            urand[1] += ${v} * (a21 * ufpts[${i} * 3] + a22 * ufpts[${i} * 3 + 1]);
+            urand[2] += ${v} * (a33 * ufpts[${i} * 3 + 2]);
 % endfor
 
     ${pyfr.expand('bc_impose_state', 'ul', 'nl', 'ur', 'urand')};
@@ -76,7 +60,7 @@
 
 <%pyfr:alias name='bc_ldg_grad_state' func='bc_common_grad_copy'/>
 
-<%pyfr:macro name='bc_common_flux_state' params='ul, gradul, artviscl, nl, magnl' externs='ploc, t, bby, bbz, runi, urand'>
+<%pyfr:macro name='bc_common_flux_state' params='ul, gradul, artviscl, nl, magnl' externs='ploc, t, urand, ufpts'>
     // Viscous states
     fpdtype_t ur[${nvars}], gradur[${ndims}][${nvars}];
     ${pyfr.expand('bc_impose_state', 'ul', 'nl', 'ur', 'urand')};
