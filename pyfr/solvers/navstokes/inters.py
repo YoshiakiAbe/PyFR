@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import matplotlib.pyplot as plt
 import numpy as np
 
 from pyfr.backends.base.kernels import ComputeMetaKernel
@@ -158,7 +157,7 @@ class NavierStokesSupOutflowBCInters(NavierStokesBaseBCInters):
 
 class NavierStokesSubInflowFrvBCInters(NavierStokesBaseBCInters):
     type = 'sub-in-frv'
-    cflux_state = None
+    cflux_state = 'ghost'
 
     def __init__(self, be, lhs, elemap, cfgsect, cfg):
         super().__init__(be, lhs, elemap, cfgsect, cfg)
@@ -168,64 +167,6 @@ class NavierStokesSubInflowFrvBCInters(NavierStokesBaseBCInters):
             default={'u': 0, 'v': 0, 'w': 0}
         )
         self._tpl_c.update(tplc)
-
-        lagt = 0.1 # turbulent time scale
-        #self.drt = 0.001 # time step size for random seed
-        #dr = {'y':0.005,'z':0.005} # uni grid size of inlet plane for random seed
-        self.drt = 0.0001 # time step size for random seed
-        dr = {'y':0.001,'z':0.001} # uni grid size of inlet plane for random seed
-        L  = {'y':5.0,'z':5.0} # correlation length
-        cmin  = {'y':-0.587872982,'z':-1.14391935} # inlet plane min y / z
-        cmax  = {'y':0.367873043,'z':1.14391935} # inlet plane max y / z
-
-        MNf = 1
-        for ind in ['y','z']: # y-z plane
-            r1d = np.arange(cmin[ind], cmax[ind] + 0.5 * dr[ind], dr[ind])
-            n = int(L[ind] / dr[ind])
-            Nf = 2 * n # or >= 2
-            Mf = int(np.round((cmax[ind] - cmin[ind]) / dr[ind])) + 1
-            MNf = MNf * (Mf + 2 * Nf)
-
-            self._tpl_c['Nf' + ind] = Nf
-            self._tpl_c['Mf' + ind] = Mf
-            self._tpl_c['d' + ind + 'r'] = dr[ind]
-            self._tpl_c[ind + 'min'] = cmin[ind]
-            self._tpl_c['MNf' + ind] = Nf * 2 + Mf
-            bb = self._be.matrix((1, 2 * Nf + 1))
-            self._set_external('bb' + ind, 'in broadcast fpdtype_t[{0}]'.format(2 * Nf + 1), value=bb)
-    
-            bbtl = [np.exp(- np.pi * np.abs(k - Nf) / n) for k in np.arange(2 * Nf + 1)]
-            bbtls = np.sum([s * s for s in bbtl], axis=0)
-            self.bbtmp = bbtmp = np.array([[s / bbtls for s in bbtl]])
-            bb.set(bbtmp)        
-
-        self.MNf = MNf
-        self._tpl_c['MNf'] = MNf
-        self.runi = runi = self._be.matrix((6, MNf))
-        self._set_external('runi', 'in broadcast fpdtype_t[{0}][{1}]'.format(6, MNf), value=runi)
-
-        urand = self._be.matrix((3, self.ninterfpts))
-        self._set_external('urand', 'inout fpdtype_t[3]', value=urand)
-
-        self._tpl_c['Coft'] = [np.exp(-0.5 * np.pi * self.drt / lagt), 
-                               np.sqrt(1.0 - np.exp(-np.pi * self.drt / lagt))]
-
-
-    def prepare(self, t):
-
-        senum = int(np.round(t / self.drt)) + 1 # "+1" is to avoid 0 at t = 0
-        np.random.seed(senum - 1)
-        runin0 = np.random.uniform(-0.5, 0.5, (3, self.MNf))
-        np.random.seed(senum)
-        runin1 = np.random.uniform(-0.5, 0.5, (3, self.MNf))
-        self.runi.set(np.vstack((runin0, runin1)))
-
-        #senum = int(np.round(t / self.drt)) + 1 # "+1" is to avoid 0 at t = 0
-        #np.random.seed(senum - 1) # need the previous t in subit...
-        #runin0 = np.array([np.random.uniform(0., 1., self.MNf) - 0.5] * 3)
-        #np.random.seed(senum)
-        #runin1 = np.array([np.random.uniform(0., 1., self.MNf) - 0.5] * 3)
-        #self.runi.set(np.vstack((runin0, runin1)))
 
 
 class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
@@ -254,7 +195,7 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
 
         self._tpl_c['vc'] = velcomps[:self.ndims]
 
-        lagt = 0.01 # turbulent time scale
+        lagt = 0.1667 # turbulent time scale
         self.drt = 0.0001 # time step size for random seed
         dr = {'y':0.001,'z':0.001} # uni grid size of inlet plane for random seed
         L  = {'y':0.1,'z':0.1} # correlation length
@@ -280,7 +221,7 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
             Mf = int((cmax[ind] - cmin[ind]) // dr[ind]) + 1
             MNf = MNf * (Mf + 2 * Nf)
             mfmin = int((xyzfpts_mins[ind] - cmin[ind]) // dr[ind])
-            mfmax = int((xyzfpts_maxs[ind] - cmin[ind]) // dr[ind]) + 1
+            mfmax = int((xyzfpts_maxs[ind] - cmin[ind]) // dr[ind])+1
             mnflim = mnflim * ((mfmax - mfmin + 1) + 2 * Nf)
             mflim = mflim * (mfmax - mfmin + 1)
 
@@ -293,6 +234,8 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
             self.mflim_e[ind] = mfmax - mfmin + 1
 
             self._tpl_c['d' + ind + 'r'] = dr[ind] 
+            self._tpl_c[ind + 'min_inlet'] = cmin[ind]
+            self._tpl_c[ind + 'max_inlet'] = cmax[ind]
             self._tpl_c[ind + 'min'] = xyzfpts_mins[ind] 
             self._tpl_c['mflim_e' + ind] = self.mflim_e[ind] 
 
@@ -304,15 +247,55 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
         self.mnflim = mnflim
         self.mflim = mflim
 
-        # Cast random velocity to fpts; Index info for casting uniform random grid to fpts
+        # Modeling Reynolds stress 
+        # uu, uw, ww, vv = R11, R21, R22, R33 
+        Amat = self._be.matrix((4, self.ninterfpts))
+        self._set_external('Amat', 'fpdtype_t[4]', value=Amat)
+        aarey = [5, 5, 5, 5] # sharpness
+        bbrey = [0.271, 2.084, 2.084, 0.833] # flat
+        ccrey = [0.0533, -0.0069, 0.0069, 0.0173] # max
+        fact = 100.0 # <= to keep std.=1.0 (from model.py)
+        fact = fact * 2.5 # amplify for ghost value
+
+        Reys = [] 
+        for i,a in enumerate(aarey):
+            tmp = []
+            for j,s in enumerate(xyzfpts.swapaxes(0, 1)):
+                z = s[2]
+                uu = ccrey[i] * (z**4 + bbrey[i]) * (np.tanh((z - cmin['z']) * a)  + np.tanh((cmax['z'] - z) * a) - 1.0)
+                tmp.append(uu)
+            Reys.append(np.array(tmp)[self._perm])
+        Reys = np.array(Reys)
+
+        aml = []
+        r11sq = np.sqrt(np.abs(Reys[0])) + 1e-10
+        aml.append(r11sq)
+        aml.append(Reys[1] / r11sq)
+        aml.append(np.sqrt(np.abs(Reys[2] - (Reys[1] / r11sq) * (Reys[1] / r11sq))))
+        aml.append(np.sqrt(np.abs(Reys[3])))
+
+        Amat.set(np.array(aml)*fact)
+        
+        ## Test 1d z line
+        ##self.z1dpts = np.linspace(-1.143, 1.143, 500)
+        #self.z1dpts = np.linspace(xyzfpts_mins['z'], xyzfpts_maxs['z'], 500)
+        #y1dpt = 0.0
+        #self.testcast = []
+        #for i,z1dpt in enumerate(self.z1dpts):
+        #    iny = int(np.round((y1dpt - xyzfpts_mins['y']) / dr['y'], 0))
+        #    inz = int(np.round((z1dpt - xyzfpts_mins['z']) / dr['z'], 0))
+        #    self.testcast.append([iny, inz])
+
+        # Cast random velocity to fpts; index info between uniform random grid and fpts
         self.fptcast = []
-        for i,s in enumerate(xyzfpts.swapaxes(0, 1)):
-            iny = int(np.round((s[1] - xyzfpts_mins['y']) / dr['y'], 0))
-            inz = int(np.round((s[2] - xyzfpts_mins['z']) / dr['z'], 0))
+        xsw = xyzfpts.swapaxes(0, 1)
+        for i,s in enumerate(xsw):
+            iny = int((s[1] - xyzfpts_mins['y']) // dr['y'])
+            inz = int((s[2] - xyzfpts_mins['z']) // dr['z'])
             self.fptcast.append([iny, inz])
 
         self.ufpts = ufpts = self._be.matrix((6, self.ninterfpts))
-        self._set_external('ufpts', 'inout fpdtype_t[6]', value=ufpts)
+        self._set_external('ufpts', 'fpdtype_t[6]', value=ufpts)
             
         urand = self._be.matrix((3, self.ninterfpts))
         self._set_external('urand', 'inout fpdtype_t[3]', value=urand)
@@ -330,7 +313,7 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
     def prepare(self, t):
 
         MNfz = self.Mf['z'] + 2 * self.Nf['z']
-        senum = int(np.round(t / self.drt)) + 1 # "+1" is to avoid 0 at t = 0
+        senum = int(np.round(t / self.drt)) + 1
         lymax = self.mfmax['y'] + 2 * self.Nf['y'] + 1
         lyseed = np.hstack((np.arange(0, self.Mf['y']), np.arange(0, 2 * self.Nf['y'] + 1)))
         lzmax = self.mfmax['z'] + 2 * self.Nf['z'] + 1
@@ -351,7 +334,7 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
                 runin2df = np.fft.fft2(runin2ds[i][:, :, j])
                 h2d_lim = np.fft.ifft2(runin2df[:, :] * self.bbzp2df).real[:mylim, :mzlim]
                 tmp.append(np.array([h2d_lim[s[0], s[1]] for s in self.fptcast])[self._perm])
-            ufpts.append(np.array(tmp).reshape(3, -1))
+            ufpts.append(np.array(tmp))
         self.ufpts.set(np.vstack((ufpts[0], ufpts[1])))        
             
 

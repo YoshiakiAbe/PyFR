@@ -28,22 +28,11 @@
 </%pyfr:macro>
 
 
-<%pyfr:macro name='bc_ldg_state' params='ul, nl, ur' externs='ploc, t, urand, ufpts'>
-
-    fpdtype_t R11 = 0.05;
-    fpdtype_t R21 = 0.05;
-    fpdtype_t R22 = 0.05;
-    fpdtype_t R33 = 0.05;
-
-    fpdtype_t a11 = sqrt(R11);
-    fpdtype_t a21 = R21 / sqrt(R11);
-    fpdtype_t a22 = sqrt(R22 - (R21 / sqrt(R11)) * (R21 / sqrt(R11)));
-    fpdtype_t a33 = sqrt(R33);
-
-    a11 = 5.0;
-    a21 = 0.0;
-    a22 = 5.0;
-    a33 = 5.0;
+<%pyfr:macro name='bc_ldg_state' params='ul, nl, ur' externs='ploc, t, urand, ufpts, Amat'>
+    fpdtype_t a11 = Amat[0];
+    fpdtype_t a21 = Amat[1];
+    fpdtype_t a22 = Amat[2];
+    fpdtype_t a33 = Amat[3];
 
     urand[0] = 0.0;
     urand[1] = 0.0;
@@ -60,7 +49,7 @@
 
 <%pyfr:alias name='bc_ldg_grad_state' func='bc_common_grad_copy'/>
 
-<%pyfr:macro name='bc_common_flux_state' params='ul, gradul, artviscl, nl, magnl' externs='ploc, t, urand, ufpts'>
+<%pyfr:macro name='bc_common_flux_state' params='ul, gradul, artviscl, nl, magnl' externs='ploc, t, urand, ufpts, Amat'>
     // Viscous states
     fpdtype_t ur[${nvars}], gradur[${ndims}][${nvars}];
     ${pyfr.expand('bc_impose_state', 'ul', 'nl', 'ur', 'urand')};
