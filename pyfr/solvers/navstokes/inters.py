@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import time
 import numpy as np
 
 from pyfr.backends.base.kernels import ComputeMetaKernel
@@ -218,10 +219,13 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
             r1d = np.arange(cmin[ind], cmax[ind] + 0.5 * dr[ind], dr[ind])
             n = int(L[ind] / dr[ind])
             Nf = 2 * n # or >= 2
-            Mf = int((cmax[ind] - cmin[ind]) // dr[ind]) + 1
+            Mf = int(np.round((cmax[ind] - cmin[ind]) / dr[ind])) + 1
+#            Mf = int((cmax[ind] - cmin[ind]) // dr[ind]) + 1
             MNf = MNf * (Mf + 2 * Nf)
-            mfmin = int((xyzfpts_mins[ind] - cmin[ind]) // dr[ind])
-            mfmax = int((xyzfpts_maxs[ind] - cmin[ind]) // dr[ind])+1
+            mfmin = int(np.round((xyzfpts_mins[ind] - cmin[ind]) / dr[ind]))
+            mfmax = int(np.round((xyzfpts_maxs[ind] - cmin[ind]) / dr[ind]))
+#            mfmin = int((xyzfpts_mins[ind] - cmin[ind]) // dr[ind])
+#            mfmax = int((xyzfpts_maxs[ind] - cmin[ind]) // dr[ind])+1
             mnflim = mnflim * ((mfmax - mfmin + 1) + 2 * Nf)
             mflim = mflim * (mfmax - mfmin + 1)
 
@@ -307,11 +311,12 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
         bbzpy, bbzpz = np.pad(self.bb1d['y'], (self.mfmax['y'] - self.mfmin['y'], 0), 'constant'),\
                        np.pad(self.bb1d['z'], (self.mfmax['z'] - self.mfmin['z'], 0), 'constant')
         bbzp2d = np.outer(bbzpy, bbzpz)
-        self.bbzp2df = np.fft.fft2(bbzp2d)
+        #self.bbzp2df = np.fft.fft2(bbzp2d)
+        self.bbzp2df = np.fft.rfft2(bbzp2d)
 
 
     def prepare(self, t):
-
+        tst = time.time()
         MNfz = self.Mf['z'] + 2 * self.Nf['z']
         senum = int(np.round(t / self.drt)) + 1
         lymax = self.mfmax['y'] + 2 * self.Nf['y'] + 1
@@ -325,18 +330,33 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
                 tmp = np.random.uniform(-0.5, 0.5, (MNfz, 3))
                 runin2d.append(tmp[self.mfmin['z'] : lzmax])
             runin2ds.append(np.array(runin2d))
+        t1 = time.time() - tst
 
         ufpts = []
         mylim, mzlim = self.mfmax['y'] - self.mfmin['y'] + 1, self.mfmax['z'] - self.mfmin['z'] + 1
+        tffta=[0.0,0.0,0.0]
         for i, sn in enumerate([senum - 1, senum]):
             tmp = []
             for j in range(3):
-                runin2df = np.fft.fft2(runin2ds[i][:, :, j])
-                h2d_lim = np.fft.ifft2(runin2df[:, :] * self.bbzp2df).real[:mylim, :mzlim]
+                tst_fft = time.time()
+                #runin2df = np.fft.fft2(runin2ds[i][:, :, j])
+                runin2df = np.fft.rfft2(runin2ds[i][:, :, j])
+                tfft = time.time() - tst_fft
+                #h2d_lim = np.fft.irfft2(runin2df[:, :] * self.bbzp2df).real[:mylim, :mzlim]
+                h2d_lim = np.fft.irfft2(runin2df * self.bbzp2df)
+                tifft = time.time() -tfft - tst_fft
                 tmp.append(np.array([h2d_lim[s[0], s[1]] for s in self.fptcast])[self._perm])
+                tcast = time.time() - tifft -tfft - tst_fft
+                tffta[0]+=tfft
+                tffta[1]+=tifft
+                tffta[2]+=tcast
             ufpts.append(np.array(tmp))
+        t2 = time.time() - t1 - tst
         self.ufpts.set(np.vstack((ufpts[0], ufpts[1])))        
-            
+        t3 = time.time() - t2 - t1 - tst
+        t4 = t1 + t2 + t3
+        print(np.round(t4,5),'|',np.round(t1,5), np.round(t3,5), '|',\
+              np.round(t2,5), '=', np.round(tffta[0],5), np.round(tffta[1],5), np.round(tffta[2],5))
 
 class NavierStokesSubOutflowBCInters(NavierStokesBaseBCInters):
     type = 'sub-out-fp'
