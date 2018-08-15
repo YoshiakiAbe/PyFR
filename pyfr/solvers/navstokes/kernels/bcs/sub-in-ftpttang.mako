@@ -49,7 +49,7 @@
 
 <%pyfr:alias name='bc_ldg_grad_state' func='bc_common_grad_copy'/>
 
-<%pyfr:macro name='bc_common_flux_state' params='ul, gradul, artviscl, nl, magnl' externs='ploc, t, urand, ufpts, Amat'>
+<%pyfr:macro name='bc_common_flux_state' params='ul, gradul, artviscl, nl, magnl' externs='ploc, t, urand'>
     // Viscous states
     fpdtype_t ur[${nvars}], gradur[${ndims}][${nvars}];
     ${pyfr.expand('bc_impose_state', 'ul', 'nl', 'ur', 'urand')};

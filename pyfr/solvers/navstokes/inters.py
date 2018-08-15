@@ -198,8 +198,13 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
 
         lagt = 0.1667 # turbulent time scale
         self.drt = 0.0001 # time step size for random seed
+        #dr = {'y':0.00075,'z':0.00075} # uni grid size of inlet plane for random seed
         dr = {'y':0.001,'z':0.001} # uni grid size of inlet plane for random seed
+        #dr = {'y':0.005,'z':0.005} # uni grid size of inlet plane for random seed
+        #dr = {'y':0.01,'z':0.01} # uni grid size of inlet plane for random seed
+
         L  = {'y':0.1,'z':0.1} # correlation length
+        #L  = {'y':0.65,'z':0.65} # correlation length for fitting ratio between inlet size/stencil size
         cmin  = {'y':-0.587872982,'z':-1.14391935} # inlet plane min y / z
         cmax  = {'y':0.367873043,'z':1.14391935} # inlet plane max y / z
 
@@ -220,12 +225,9 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
             n = int(L[ind] / dr[ind])
             Nf = 2 * n # or >= 2
             Mf = int(np.round((cmax[ind] - cmin[ind]) / dr[ind])) + 1
-#            Mf = int((cmax[ind] - cmin[ind]) // dr[ind]) + 1
             MNf = MNf * (Mf + 2 * Nf)
             mfmin = int(np.round((xyzfpts_mins[ind] - cmin[ind]) / dr[ind]))
             mfmax = int(np.round((xyzfpts_maxs[ind] - cmin[ind]) / dr[ind]))
-#            mfmin = int((xyzfpts_mins[ind] - cmin[ind]) // dr[ind])
-#            mfmax = int((xyzfpts_maxs[ind] - cmin[ind]) // dr[ind])+1
             mnflim = mnflim * ((mfmax - mfmin + 1) + 2 * Nf)
             mflim = mflim * (mfmax - mfmin + 1)
 
@@ -251,16 +253,15 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
         self.mnflim = mnflim
         self.mflim = mflim
 
+        print('mflim,mymax,mzmax=',self.mflim,self.mflim_e['y'],self.mflim_e['z'])
+
         # Modeling Reynolds stress 
         # uu, uw, ww, vv = R11, R21, R22, R33 
-        Amat = self._be.matrix((4, self.ninterfpts))
-        self._set_external('Amat', 'fpdtype_t[4]', value=Amat)
         aarey = [5, 5, 5, 5] # sharpness
         bbrey = [0.271, 2.084, 2.084, 0.833] # flat
         ccrey = [0.0533, -0.0069, 0.0069, 0.0173] # max
         fact = 100.0 # <= to keep std.=1.0 (from model.py)
-        fact = fact * 2.5 # amplify for ghost value
-
+        fact = fact * 0.5 # amplify for ghost value
         Reys = [] 
         for i,a in enumerate(aarey):
             tmp = []
@@ -270,40 +271,56 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
                 tmp.append(uu)
             Reys.append(np.array(tmp)[self._perm])
         Reys = np.array(Reys)
-
         aml = []
         r11sq = np.sqrt(np.abs(Reys[0])) + 1e-10
         aml.append(r11sq)
         aml.append(Reys[1] / r11sq)
         aml.append(np.sqrt(np.abs(Reys[2] - (Reys[1] / r11sq) * (Reys[1] / r11sq))))
         aml.append(np.sqrt(np.abs(Reys[3])))
-
+        Amat = self._be.matrix((4, self.ninterfpts))
+        self._set_external('Amat', 'fpdtype_t[4]', value=Amat)
         Amat.set(np.array(aml)*fact)
         
-        ## Test 1d z line
-        ##self.z1dpts = np.linspace(-1.143, 1.143, 500)
-        #self.z1dpts = np.linspace(xyzfpts_mins['z'], xyzfpts_maxs['z'], 500)
-        #y1dpt = 0.0
-        #self.testcast = []
-        #for i,z1dpt in enumerate(self.z1dpts):
-        #    iny = int(np.round((y1dpt - xyzfpts_mins['y']) / dr['y'], 0))
-        #    inz = int(np.round((z1dpt - xyzfpts_mins['z']) / dr['z'], 0))
-        #    self.testcast.append([iny, inz])
-
         # Cast random velocity to fpts; index info between uniform random grid and fpts
-        self.fptcast = []
+        #                             [f00   f01][cz[0]]
+        # [f[y] f[z]] = [cy[0], cy[1]][         ][     ]       
+        #                             [f10   f11][cz[1]]
         xsw = xyzfpts.swapaxes(0, 1)
+        self.fptcast = (np.empty(self.ninterfpts, dtype=np.int32), np.empty(self.ninterfpts, dtype=np.int32))
+        self.qpck = [(np.empty(self.ninterfpts, dtype=np.int32), np.empty(self.ninterfpts, dtype=np.int32)) for i in range(4)]
+        fptcast_tmp = np.empty((2, self.ninterfpts), dtype=np.int32)
+        qpck_tmp = [np.empty((2, self.ninterfpts), dtype=np.int32) for i in range(4)]
+        self.cy = np.empty((2, self.ninterfpts))
+        self.cz = np.empty((2, self.ninterfpts))
         for i,s in enumerate(xsw):
             iny = int((s[1] - xyzfpts_mins['y']) // dr['y'])
             inz = int((s[2] - xyzfpts_mins['z']) // dr['z'])
-            self.fptcast.append([iny, inz])
+            inyp = min(iny + 1, self.mfmax['y'] - 1)
+            inzp = min(inz + 1, self.mfmax['z'] - 1)
+            fptcast_tmp[0][i], fptcast_tmp[1][i] = iny, inz
+            self.cy[0][i] = xyzfpts_mins['y'] + dr['y'] * (iny + 1) - s[1]
+            self.cz[0][i] = xyzfpts_mins['z'] + dr['z'] * (inz + 1) - s[2]
+            self.cy[1][i] = dr['y'] - self.cy[0][i]
+            self.cz[1][i] = dr['z'] - self.cz[0][i]
+            qpck_tmp[0][0][i], qpck_tmp[0][1][i], qpck_tmp[1][0][i], qpck_tmp[1][1][i] = iny, inz, iny, inzp
+            qpck_tmp[2][0][i], qpck_tmp[2][1][i], qpck_tmp[3][0][i], qpck_tmp[3][1][i] = inyp, inz, inyp, inzp
+        self.cy = self.cy / (dr['y'] * dr['z'])
+        self.cy[0], self.cy[1] = self.cy[0][self._perm], self.cy[1][self._perm]
+        self.cz[0], self.cz[1] = self.cz[0][self._perm], self.cz[1][self._perm]
+        # Permute
+        fptcast_tmp[0], fptcast_tmp[1] = fptcast_tmp[0][self._perm], fptcast_tmp[1][self._perm]
+        for i in range(4):
+            qpck_tmp[i][0], qpck_tmp[i][1] = qpck_tmp[i][0][self._perm], qpck_tmp[i][1][self._perm]
+        for i in range(self.ninterfpts):
+            self.fptcast[0][i], self.fptcast[1][i] = (fptcast_tmp[0][i], fptcast_tmp[1][i])
+            for j in range(4):
+                self.qpck[j][0][i], self.qpck[j][1][i] = (qpck_tmp[j][0][i], qpck_tmp[j][1][i])
 
-        self.ufpts = ufpts = self._be.matrix((6, self.ninterfpts))
-        self._set_external('ufpts', 'fpdtype_t[6]', value=ufpts)
-            
-        urand = self._be.matrix((3, self.ninterfpts))
+        # Allocate urand
+        self.urand = urand = self._be.matrix((3, self.ninterfpts))
         self._set_external('urand', 'inout fpdtype_t[3]', value=urand)
 
+        # Allocate Coft for temporal filtering
         self._tpl_c['Coft'] = [np.exp(-0.5 * np.pi * self.drt / lagt), 
                                np.sqrt(1.0 - np.exp(-np.pi * self.drt / lagt))]
 
@@ -311,52 +328,92 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
         bbzpy, bbzpz = np.pad(self.bb1d['y'], (self.mfmax['y'] - self.mfmin['y'], 0), 'constant'),\
                        np.pad(self.bb1d['z'], (self.mfmax['z'] - self.mfmin['z'], 0), 'constant')
         bbzp2d = np.outer(bbzpy, bbzpz)
-        #self.bbzp2df = np.fft.fft2(bbzp2d)
         self.bbzp2df = np.fft.rfft2(bbzp2d)
 
-
-    def prepare(self, t):
-        tst = time.time()
+        # Allocate ufpts
+        self.ufpts = ufpts = self._be.matrix((6, self.ninterfpts))
+        self._set_external('ufpts', 'fpdtype_t[6]', value=ufpts)
+        self.ufpts_prev = np.zeros((3, self.ninterfpts))
         MNfz = self.Mf['z'] + 2 * self.Nf['z']
-        senum = int(np.round(t / self.drt)) + 1
         lymax = self.mfmax['y'] + 2 * self.Nf['y'] + 1
         lyseed = np.hstack((np.arange(0, self.Mf['y']), np.arange(0, 2 * self.Nf['y'] + 1)))
         lzmax = self.mfmax['z'] + 2 * self.Nf['z'] + 1
-        runin2ds = []
-        for i, sn in enumerate([senum - 1, senum]):
-            runin2d = []
-            for ly in range(self.mfmin['y'], lymax):
-                np.random.seed((sn, lyseed[ly]))
-                tmp = np.random.uniform(-0.5, 0.5, (MNfz, 3))
-                runin2d.append(tmp[self.mfmin['z'] : lzmax])
-            runin2ds.append(np.array(runin2d))
-        t1 = time.time() - tst
+        runin2ds = np.empty((lymax - self.mfmin['y'], lzmax - self.mfmin['z']))
+        t = 0.0 # initial time
+        senum = int(np.round(t / self.drt))
+        for j in range(3):
+            for i, ly in enumerate(range(self.mfmin['y'], lymax)):
+                np.random.seed((senum, j, lyseed[ly]))
+                tmp = np.random.uniform(-0.5, 0.5, MNfz)
+                runin2ds[i, :] = tmp[self.mfmin['z'] : lzmax]
+            runin2df = np.fft.rfft2(runin2ds)
+            runin2df *= self.bbzp2df
+            h2d_lim = np.fft.irfft2(runin2df)
 
-        ufpts = []
-        mylim, mzlim = self.mfmax['y'] - self.mfmin['y'] + 1, self.mfmax['z'] - self.mfmin['z'] + 1
-        tffta=[0.0,0.0,0.0]
-        for i, sn in enumerate([senum - 1, senum]):
-            tmp = []
-            for j in range(3):
-                tst_fft = time.time()
-                #runin2df = np.fft.fft2(runin2ds[i][:, :, j])
-                runin2df = np.fft.rfft2(runin2ds[i][:, :, j])
-                tfft = time.time() - tst_fft
-                #h2d_lim = np.fft.irfft2(runin2df[:, :] * self.bbzp2df).real[:mylim, :mzlim]
-                h2d_lim = np.fft.irfft2(runin2df * self.bbzp2df)
-                tifft = time.time() -tfft - tst_fft
-                tmp.append(np.array([h2d_lim[s[0], s[1]] for s in self.fptcast])[self._perm])
-                tcast = time.time() - tifft -tfft - tst_fft
-                tffta[0]+=tfft
-                tffta[1]+=tifft
-                tffta[2]+=tcast
-            ufpts.append(np.array(tmp))
+            # Bilinear interpolation
+            fmat = np.array([[h2d_lim[self.qpck[0]], h2d_lim[self.qpck[1]]],\
+                             [h2d_lim[self.qpck[2]], h2d_lim[self.qpck[3]]]])
+            self.ufpts_prev[j, :] = np.array([np.dot(np.dot(self.cy[:, i], fmat[:, :, i]), self.cz[:, i])\
+                                     for i in range(self.ninterfpts)])
+
+            # Round off
+            #self.ufpts_prev[j, :] = h2d_lim[self.fptcast] 
+
+    def prepare(self, t):
+        tst = time.time()
+        self.ta = ta = [0.0, 0.0, 0.0, 0.0, 0.0]
+
+        senum = int(np.round(t / self.drt)) + 1
+        MNfz = self.Mf['z'] + 2 * self.Nf['z']
+        lymax = self.mfmax['y'] + 2 * self.Nf['y'] + 1
+        lyseed = np.hstack((np.arange(0, self.Mf['y']), np.arange(0, 2 * self.Nf['y'] + 1)))
+        lzmax = self.mfmax['z'] + 2 * self.Nf['z'] + 1
+
+        runin2ds = np.empty((lymax - self.mfmin['y'], lzmax - self.mfmin['z']))
+        ufpts = np.empty((3, self.ninterfpts))
+
+        for j in range(3):
+            tst_rand = time.time()
+            for i, ly in enumerate(range(self.mfmin['y'], lymax)):
+                np.random.seed((senum, j, lyseed[ly]))
+                tmp = np.random.uniform(-0.5, 0.5, MNfz)
+                runin2ds[i, :] = tmp[self.mfmin['z'] : lzmax]
+            trand = time.time() - tst_rand
+
+            tst_fft = time.time()
+            runin2df = np.fft.rfft2(runin2ds)
+            tfft = time.time() - tst_fft
+            runin2df *= self.bbzp2df
+            tmul = time.time() - tfft - tst_fft
+            h2d_lim = np.fft.irfft2(runin2df)
+            tifft = time.time() - tmul - tfft - tst_fft
+
+            # Bilinear interpolation
+            fmat = np.array([[h2d_lim[self.qpck[0]], h2d_lim[self.qpck[1]]],\
+                             [h2d_lim[self.qpck[2]], h2d_lim[self.qpck[3]]]])
+            ufpts[j, :] = np.array([np.dot(np.dot(self.cy[:, i], fmat[:, :, i]), self.cz[:, i])\
+                                  for i in range(self.ninterfpts)])
+
+            # Round off
+            #ufpts[j, :] = h2d_lim[self.fptcast]
+            tcast = time.time() - tifft - tmul - tfft - tst_fft
+            ta[0]+=tfft
+            ta[1]+=tifft
+            ta[2]+=tcast
+            ta[3]+=tmul
+            ta[4]+=trand
+
+        t1 = time.time() - tst
+        self.ufpts.set(np.vstack((self.ufpts_prev, ufpts)))
         t2 = time.time() - t1 - tst
-        self.ufpts.set(np.vstack((ufpts[0], ufpts[1])))        
-        t3 = time.time() - t2 - t1 - tst
-        t4 = t1 + t2 + t3
-        print(np.round(t4,5),'|',np.round(t1,5), np.round(t3,5), '|',\
-              np.round(t2,5), '=', np.round(tffta[0],5), np.round(tffta[1],5), np.round(tffta[2],5))
+        self.ufpts_prev = ufpts        
+        t4 = time.time() - tst
+        print('total=',np.round(t4,5),'| rand=',np.round(self.ta[4],5), ' kernelset=',np.round(t2,5), \
+          'fft/ifft=',np.round(t1,5), '(fft=', np.round(self.ta[0],5), ' ifft=',np.round(self.ta[1],5),\
+          ' cast=',np.round(self.ta[2],5), ' mul=',np.round(self.ta[3],5),')')
+
+
+
 
 class NavierStokesSubOutflowBCInters(NavierStokesBaseBCInters):
     type = 'sub-out-fp'
