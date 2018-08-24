@@ -195,9 +195,9 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
 
         self._tpl_c['vc'] = velcomps[:self.ndims]
 
-        lagt = 0.1667 # turbulent time scale
-        self.drt = 0.0001 # time step size for random seed
-        dr = {'y':0.01,'z':0.01} # uni grid size of inlet plane for random seed
+        lagt = 0.11118 # turbulent time scale (L/u1 = 0.05 /0.449725)
+        self.drt = 0.01 # time step size for random seed
+        dr = {'y':0.005,'z':0.005} # uni grid size of inlet plane for random seed
         L  = {'y':0.05,'z':0.05} # correlation length
         cmin  = {'y':-0.587872982,'z':-1.14391935} # inlet plane min y / z
         cmax  = {'y':0.367873043,'z':1.14391935} # inlet plane max y / z
@@ -262,12 +262,12 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
         Amat = self._be.matrix((4, self.ninterfpts))
         self._set_external('Amat', 'fpdtype_t[4]', value=Amat)
 
-        # uu, uw, ww, vv = R11, R21, R22, R33 
-        aarey=[50,50,50,50]
-        bbrey=[0.703,10.001,10.001,2.743]
-        ccrey=[0.02049,-0.001431,0.001431,0.005250]
-
-        fact = 6.0 # <= to keep std.=1.0 
+	    # uu, uw, ww, vv = R11, R21, R22, R33
+        aarey = [50, 50, 50, 50] # sharpness
+	    bbrey = [0.7030,10.0,10.0,2.743] # flat 
+        ccrey = [0.02049,-0.001431,0.001431,0.005250] # max
+        labels = ['uu', 'uw', 'ww', 'vv']
+        fact = 11.0 # <= to keep std.=1.0
         fact = fact * 1.0 # amplify for ghost value
 
         Reys = [] 
@@ -329,8 +329,8 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
 
         # Initial step / tprev >t case treatment (calculate runi_prev, uspr_prev in kernel)
         senum_curr = int(np.round(t / self.drt)) + 1 # +1 is to avoid negative value at t=0
-        #print(self.InitFlag_pls, self.senum_prev, senum_curr)
-        if self.InitFlag_pls[0][0] == 0 or self.senum_prev >= senum_curr: # initial case or tprev >= tcurr
+
+        if self.InitFlag_pls[0][0] == 0 or self.senum_prev + 1 != senum_curr: # initial case or tprev + 1 != tcurr
             self.senum_prev = senum_prev = int(np.round(t / self.drt))
             for ly in range(self.mfmin['y'], lymax):
                 np.random.seed((senum_prev, lyseed[ly]))
@@ -350,7 +350,6 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
         self.runi.set(runi)
         self.runi_prev_cp = runi
 
-        #print('renew',self.InitFlag_pls, self.senum_prev, senum_curr)
         self.InitFlag_pls[0][0] += 1
         self.senum_prev = senum_curr
 
