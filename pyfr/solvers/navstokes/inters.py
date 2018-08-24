@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import time
 import numpy as np
 
 from pyfr.backends.base.kernels import ComputeMetaKernel
@@ -198,13 +197,8 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
 
         lagt = 0.1667 # turbulent time scale
         self.drt = 0.0001 # time step size for random seed
-        #dr = {'y':0.00075,'z':0.00075} # uni grid size of inlet plane for random seed
         dr = {'y':0.001,'z':0.001} # uni grid size of inlet plane for random seed
-        #dr = {'y':0.005,'z':0.005} # uni grid size of inlet plane for random seed
-        #dr = {'y':0.01,'z':0.01} # uni grid size of inlet plane for random seed
-
         L  = {'y':0.1,'z':0.1} # correlation length
-        #L  = {'y':0.65,'z':0.65} # correlation length for fitting ratio between inlet size/stencil size
         cmin  = {'y':-0.587872982,'z':-1.14391935} # inlet plane min y / z
         cmax  = {'y':0.367873043,'z':1.14391935} # inlet plane max y / z
 
@@ -360,9 +354,6 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
             #self.ufpts_prev[j, :] = h2d_lim[self.fptcast] 
 
     def prepare(self, t):
-        tst = time.time()
-        self.ta = ta = [0.0, 0.0, 0.0, 0.0, 0.0]
-
         senum = int(np.round(t / self.drt)) + 1
         MNfz = self.Mf['z'] + 2 * self.Nf['z']
         lymax = self.mfmax['y'] + 2 * self.Nf['y'] + 1
@@ -373,20 +364,14 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
         ufpts = np.empty((3, self.ninterfpts))
 
         for j in range(3):
-            tst_rand = time.time()
             for i, ly in enumerate(range(self.mfmin['y'], lymax)):
                 np.random.seed((senum, j, lyseed[ly]))
                 tmp = np.random.uniform(-0.5, 0.5, MNfz)
                 runin2ds[i, :] = tmp[self.mfmin['z'] : lzmax]
-            trand = time.time() - tst_rand
 
-            tst_fft = time.time()
             runin2df = np.fft.rfft2(runin2ds)
-            tfft = time.time() - tst_fft
             runin2df *= self.bbzp2df
-            tmul = time.time() - tfft - tst_fft
             h2d_lim = np.fft.irfft2(runin2df)
-            tifft = time.time() - tmul - tfft - tst_fft
 
             # Bilinear interpolation
             fmat = np.array([[h2d_lim[self.qpck[0]], h2d_lim[self.qpck[1]]],\
@@ -394,23 +379,9 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
             ufpts[j, :] = np.array([np.dot(np.dot(self.cy[:, i], fmat[:, :, i]), self.cz[:, i])\
                                   for i in range(self.ninterfpts)])
 
-            # Round off
-            #ufpts[j, :] = h2d_lim[self.fptcast]
-            tcast = time.time() - tifft - tmul - tfft - tst_fft
-            ta[0]+=tfft
-            ta[1]+=tifft
-            ta[2]+=tcast
-            ta[3]+=tmul
-            ta[4]+=trand
 
-        t1 = time.time() - tst
         self.ufpts.set(np.vstack((self.ufpts_prev, ufpts)))
-        t2 = time.time() - t1 - tst
         self.ufpts_prev = ufpts        
-        t4 = time.time() - tst
-        print('total=',np.round(t4,5),'| rand=',np.round(self.ta[4],5), ' kernelset=',np.round(t2,5), \
-          'fft/ifft=',np.round(t1,5), '(fft=', np.round(self.ta[0],5), ' ifft=',np.round(self.ta[1],5),\
-          ' cast=',np.round(self.ta[2],5), ' mul=',np.round(self.ta[3],5),')')
 
 
 
