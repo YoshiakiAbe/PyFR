@@ -264,7 +264,7 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
 
 	    # uu, uw, ww, vv = R11, R21, R22, R33
         aarey = [50, 50, 50, 50] # sharpness
-	    bbrey = [0.7030,10.0,10.0,2.743] # flat 
+        bbrey = [0.7030,10.0,10.0,2.743] # flat
         ccrey = [0.02049,-0.001431,0.001431,0.005250] # max
         labels = ['uu', 'uw', 'ww', 'vv']
         fact = 11.0 # <= to keep std.=1.0
