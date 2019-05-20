@@ -195,10 +195,18 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
 
         self._tpl_c['vc'] = velcomps[:self.ndims]
 
-        lagt = 0.11118 # turbulent time scale (L/u1 = 0.05 /0.449725)
-        self.drt = 0.01 # time step size for random seed
+        # Looking for inlet pressure
+        pin = self.cfg.getfloat('constants', 'p1')
+        self._tpl_c['pin'] = pin
+        rhoin = self.cfg.getfloat('constants', 'rho1')
+        self._tpl_c['rhoin'] = rhoin
+        uin = self.cfg.getfloat('constants', 'u1')
+        self._tpl_c['uin'] = uin
+
+        lagt = 1.1118 # turbulent time scale (L/u1 = 0.05 /0.449725)
+        self.drt = 5e-5 # time step size for random seed
         dr = {'y':0.005,'z':0.005} # uni grid size of inlet plane for random seed
-        L  = {'y':0.05,'z':0.05} # correlation length
+        L  = {'y':0.0125,'z':0.0125} # correlation length
         cmin  = {'y':-0.587872982,'z':-1.14391935} # inlet plane min y / z
         cmax  = {'y':0.367873043,'z':1.14391935} # inlet plane max y / z
 
@@ -262,13 +270,13 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
         Amat = self._be.matrix((4, self.ninterfpts))
         self._set_external('Amat', 'fpdtype_t[4]', value=Amat)
 
-	    # uu, uw, ww, vv = R11, R21, R22, R33
-        aarey = [50, 50, 50, 50] # sharpness
-        bbrey = [0.7030,10.0,10.0,2.743] # flat
-        ccrey = [0.02049,-0.001431,0.001431,0.005250] # max
+        # uu, uw, ww, vv = R11, R21, R22, R33 # modelB Phys0
+        aarey = [50., 50., 50., 50.] # sharpness
+        bbrey = [0.7030, 10.0, 10.0, 2.743] # flat
+        ccrey = [0.02021, -0.001411, 0.001411, 0.005178] # max
         labels = ['uu', 'uw', 'ww', 'vv']
         fact = 11.0 # <= to keep std.=1.0
-        fact = fact * 1.0 # amplify for ghost value
+        fact = fact * 0.75 # amplify for ghost value
 
         Reys = [] 
         for i,a in enumerate(aarey):
@@ -342,16 +350,27 @@ class NavierStokesSubInflowFtpttangBCInters(NavierStokesBaseBCInters):
         self.InitFlag.set(self.InitFlag_pls)
         self.runi_prev.set(self.runi_prev_cp)
 
-        for ly in range(self.mfmin['y'], lymax):
-            np.random.seed((senum_curr, lyseed[ly]))
-            tmp = np.random.uniform(-0.5, 0.5, (3, MNfz))
-            ls = (ly - self.mfmin['y']) * self.mnflim_e['z'] + 0
-            runi[:, ls : ls + self.mnflim_e['z']] = tmp[:, self.mfmin['z'] : self.mfmax['z'] + 2 * self.Nf['z'] + 1]
-        self.runi.set(runi)
-        self.runi_prev_cp = runi
+        if self.InitFlag_pls[0][0] == 0:
+            for ly in range(self.mfmin['y'], lymax):
+                np.random.seed((senum_curr, lyseed[ly]))
+                tmp = np.random.uniform(-0.5, 0.5, (3, MNfz))
+                ls = (ly - self.mfmin['y']) * self.mnflim_e['z'] + 0
+                runi[:, ls : ls + self.mnflim_e['z']] = tmp[:, self.mfmin['z'] : self.mfmax['z'] + 2 * self.Nf['z'] + 1]
+            self.runi.set(runi)
+            self.runi_prev_cp = runi
 
+        if np.mod(senum_curr, 20000) == 0:
+            for ly in range(self.mfmin['y'], lymax):
+                np.random.seed((senum_curr, lyseed[ly]))
+                tmp = np.random.uniform(-0.5, 0.5, (3, MNfz))
+                ls = (ly - self.mfmin['y']) * self.mnflim_e['z'] + 0
+                runi[:, ls : ls + self.mnflim_e['z']] = tmp[:, self.mfmin['z'] : self.mfmax['z'] + 2 * self.Nf['z'] + 1]
+            self.runi.set(runi)
+            self.runi_prev_cp = runi
+            self.senum_prev = senum_curr
+            
         self.InitFlag_pls[0][0] += 1
-        self.senum_prev = senum_curr
+
 
 class NavierStokesSubOutflowBCInters(NavierStokesBaseBCInters):
     type = 'sub-out-fp'

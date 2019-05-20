@@ -20,7 +20,9 @@
     fpdtype_t udotu_fluc = ${pyfr.dot('urand[{i}]', i=(0, ndims))};
     udotu = (udotu > 0 ? udotu : 0);
 
-    ur[0] = ${1.0 / c['Rdcp']} * pl / (${c['cpTt']} - 0.5 * (udotu + udotu_fluc));
+    fpdtype_t rho_fluc = 2.0 * ${c['rhoin']} * urande[0] / ${c['uin']} * ( pow(pt/${c['pin']}, ${c['Rdcp']}) - 1.0);
+
+    ur[0] = ${1.0 / c['Rdcp']} * pl / (${c['cpTt']} - 0.5 * udotu) + rho_fluc;
 % for i, v in enumerate(c['vc']):
     ur[${i + 1}] = ${v} * ur[0] * sqrt(udotu) + ur[0] * urand[${i}];
 % endfor
